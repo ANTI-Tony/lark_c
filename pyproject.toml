@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cua-lark"
+version = "0.1.0"
+description = "Vision-driven Computer-Use Agent for automated QA testing of the Feishu desktop client"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Tony Wen" }]
+license = { text = "Proprietary" }
+dependencies = [
+    "anthropic>=0.40.0",
+    "pyautogui>=0.9.54",
+    "pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.7.0",
+    "mss>=9.0.1",
+]
+
+[project.scripts]
+cua-lark = "cua_lark.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cua_lark*"]
