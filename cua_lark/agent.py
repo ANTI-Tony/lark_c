@@ -34,8 +34,11 @@ from .trajectory import Trajectory
 log = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
-BETA_HEADER = "computer-use-2025-01-24"
-TOOL_TYPE = "computer_20250124"
+# Claude Sonnet 4.6 / Opus 4.6+ require the 2025-11-24 contract.
+# Older models (Sonnet 4.5, Haiku 4.5, Sonnet 3.7, ...) use computer_20250124
+# with the computer-use-2025-01-24 beta header — but we don't target those.
+BETA_HEADER = "computer-use-2025-11-24"
+TOOL_TYPE = "computer_20251124"
 
 SYSTEM_PROMPT = """You are CUA-Lark, a GUI testing agent driving the Feishu (Lark) desktop client.
 
