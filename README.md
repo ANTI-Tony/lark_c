@@ -39,11 +39,11 @@ Traditional GUI automation breaks every time the UI changes. A vision-language a
 
 | | Goal | Status |
 |---|---|---|
-| M1 | Screenshot → Claude → single-step click/type loop | ✅ W1 |
-| M2 | Multi-step IM flows with verification | ⏳ |
-| M3 | Docs + Calendar coverage | ⏳ |
-| M4 | Eval framework + HTML report | ⏳ |
-| M5 | Self-heal + cross-product chains | ⏳ |
+| M1 | Screenshot → Claude → single-step click/type loop | done |
+| M2 | DSL + CDP client + Verifier + 3 IM cases | code done, live-debug pending |
+| M3 | Docs + Calendar coverage | next |
+| M4 | Eval framework + HTML report | |
+| M5 | Self-heal (via `zoom`) + cross-product chains | |
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for the full plan.
 
@@ -73,9 +73,29 @@ python -m cua_lark.cli run "打开飞书,点击第一个聊天"
 
 # Or run the Feishu hello-world example
 python examples/hello_feishu.py
+
+# Run the IM test suite (M2)
+python -m cua_lark.cli test tests/feishu/im/
+
+# Filter by tag, or skip CDP if Feishu was launched without --remote-debugging-port
+python -m cua_lark.cli test tests/feishu/ --tag im --no-cdp
 ```
 
-Every run writes a trajectory to `runs/<timestamp>/` (screenshots + `trajectory.json`).
+Every run writes a trajectory to `runs/<timestamp>/` (screenshots + `trajectory.json`,
+plus `test_report.json` for test-mode runs).
+
+### Enabling CDP-backed assertions
+
+Launch Feishu with the Electron debug port exposed so the verifier can query
+the DOM directly:
+
+```bash
+# macOS
+open -a "Feishu" --args --remote-debugging-port=9222
+```
+
+Without that flag, CDP assertions fail with a clear message and the VLM
+channel still works.
 
 ## Safety
 
@@ -94,13 +114,18 @@ Every run writes a trajectory to `runs/<timestamp>/` (screenshots + `trajectory.
 ```
 cua-lark/
 ├── cua_lark/           # library
-│   ├── perception.py
-│   ├── executor.py
-│   ├── agent.py
-│   ├── trajectory.py
-│   └── cli.py
+│   ├── perception.py   # screenshot + Retina scaling
+│   ├── executor.py     # PyAutoGUI wrapper
+│   ├── agent.py        # Claude Computer Use loop
+│   ├── trajectory.py   # per-run artifact log
+│   ├── cdp.py          # Electron debug-port client
+│   ├── verifier.py     # VLM + CDP assertion engines
+│   ├── dsl.py          # @cua_test decorator + TestContext
+│   ├── runner.py       # discover / execute / report
+│   └── cli.py          # `cua-lark run`, `cua-lark test`
 ├── examples/
 │   └── hello_feishu.py
+├── tests/feishu/im/    # M2 test cases
 ├── docs/
 │   ├── DESIGN.md
 │   └── ROADMAP.md

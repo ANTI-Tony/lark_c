@@ -14,12 +14,14 @@ Solo build, roughly eight weeks from repo init to final submission.
 
 **Exit criterion:** agent can perform ≥5 single-step actions on the live Feishu client from natural-language instructions.
 
-## M2 · Multi-step flows + verification  — week 3–4
+## M2 · Multi-step flows + verification  — week 3–4  (in progress)
 
-- [ ] Testing DSL (YAML or Python decorator form) with `assert_visible`, `assert_text`, `assert_sent`.
-- [ ] CDP client: connect to Feishu's Electron debug port, read DOM + a11y tree.
-- [ ] Verifier: VLM semantic diff + CDP structured assertion.
-- [ ] Three end-to-end IM test cases (send text, create group, search message).
+- [x] Testing DSL: Python decorator form with `assert_visible`, `assert_dom_text`, `assert_dom_any`.
+- [x] CDP client: synchronous JSON-RPC client over Electron debug websocket.
+- [x] Verifier: `VlmVerifier` (Claude semantic check) + `CdpVerifier` (DOM text queries).
+- [x] Test runner with structured `test_report.json` per run + Rich summary table.
+- [x] Three IM test cases authored against the DSL (`tests/feishu/im/im_basic.py`).
+- [ ] Live debug pass against the running Feishu client (depends on local environment).
 
 ## M3 · Multi-product coverage  — week 5
 

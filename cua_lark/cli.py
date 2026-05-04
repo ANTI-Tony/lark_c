@@ -26,6 +26,41 @@ from .trajectory import Trajectory
 console = Console()
 
 
+def cmd_test(args: argparse.Namespace) -> int:
+    from .runner import discover, render_summary, run_one
+
+    cases = discover(args.path)
+    if not cases:
+        console.print(f"[yellow]No @cua_test cases discovered under {args.path}[/yellow]")
+        return 1
+
+    console.print(Panel.fit(
+        f"[bold]discovered:[/bold] {len(cases)} test case(s)\n"
+        f"[bold]path:[/bold]       {args.path}\n"
+        f"[bold]CDP:[/bold]        {'disabled' if args.no_cdp else 'auto'}\n"
+        f"[bold]runs dir:[/bold]   {args.runs_dir}",
+        title="CUA-Lark · test",
+        border_style="cyan",
+    ))
+
+    selected = cases
+    if args.tag:
+        selected = [c for c in cases if args.tag in c.tags]
+        if not selected:
+            console.print(f"[yellow]No tests matched tag {args.tag!r}[/yellow]")
+            return 1
+
+    reports = []
+    for case in selected:
+        console.print(f"\n[cyan]→ {case.name}[/cyan]" + (f" [dim]{list(case.tags)}[/dim]" if case.tags else ""))
+        report = run_one(case, runs_root=args.runs_dir, use_cdp=not args.no_cdp)
+        reports.append(report)
+
+    console.print()
+    render_summary(reports)
+    return 0 if all(r.passed for r in reports) else 1
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     instruction = args.instruction.strip()
     if not instruction:
@@ -85,6 +120,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging.")
     run.set_defaults(func=cmd_run)
+
+    test = sub.add_parser("test", help="Run @cua_test cases discovered in a path.")
+    test.add_argument("path", type=Path, help="File or directory containing test cases.")
+    test.add_argument(
+        "--no-cdp",
+        action="store_true",
+        help="Skip CDP session; assertions fall back to the VLM channel only.",
+    )
+    test.add_argument("--tag", default=None, help="Only run cases registered with this tag.")
+    test.add_argument(
+        "--runs-dir",
+        default="runs",
+        type=Path,
+        help="Directory under which per-run artifacts are written (default: ./runs).",
+    )
+    test.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging.")
+    test.set_defaults(func=cmd_test)
 
     return parser
 
