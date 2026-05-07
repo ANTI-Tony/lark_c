@@ -26,6 +26,31 @@ from .trajectory import Trajectory
 console = Console()
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    from .report import render_index, render_run
+
+    target: Path = args.path
+    if target.is_file() or (target / "trajectory.json").exists():
+        out = render_run(target if target.is_dir() else target.parent)
+        console.print(f"[green]wrote[/green] {out}")
+        return 0
+
+    if not target.is_dir():
+        console.print(f"[red]not a directory:[/red] {target}")
+        return 2
+
+    rendered = []
+    for run_dir in sorted(p for p in target.iterdir() if p.is_dir()):
+        if (run_dir / "trajectory.json").exists():
+            try:
+                rendered.append(render_run(run_dir))
+            except Exception as exc:  # noqa: BLE001
+                console.print(f"[yellow]skipping {run_dir}: {exc}[/yellow]")
+    index = render_index(target)
+    console.print(f"[green]wrote {len(rendered)} reports + index:[/green] {index}")
+    return 0
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     from .runner import discover, render_summary, run_one
 
@@ -137,6 +162,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     test.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging.")
     test.set_defaults(func=cmd_test)
+
+    report = sub.add_parser(
+        "report",
+        help="Generate a self-contained HTML report from a runs/ directory or a single run.",
+    )
+    report.add_argument(
+        "path",
+        type=Path,
+        help="Either a single run dir (containing trajectory.json) or a runs/ root.",
+    )
+    report.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging.")
+    report.set_defaults(func=cmd_report)
 
     return parser
 

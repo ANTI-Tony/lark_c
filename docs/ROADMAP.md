@@ -29,15 +29,19 @@ Solo build, roughly eight weeks from repo init to final submission.
 - [ ] Calendar: create event, invite attendees, assert on mini-calendar view.
 - [ ] Two passing cases per product.
 
-## M4 · Evaluation framework  — week 6
+## M4 · Evaluation framework  — week 6  (in progress)
 
-- [ ] Run-aggregator that batches test cases and summarizes metrics (success rate, step count, latency, token spend).
-- [ ] HTML report with timeline screenshots + assertion pass/fail.
+- [x] Self-contained HTML report per run — screenshots inlined as data URIs, no external assets.
+- [x] Aggregate index page (`runs/index.html`) over all runs.
+- [x] `cua-lark report <path>` CLI subcommand.
+- [ ] Metrics dashboard: success rate, step count, latency, token spend (next).
 - [ ] Baseline comparison scaffolding (selector-based vs CUA).
 
-## M5 · Differentiators  — week 7
+## M5 · Differentiators  — week 7  (in progress)
 
-- [ ] Self-heal: on executor failure, replan with a targeted "your last click missed, look again" prompt and retry.
+- [x] Self-heal v1: enable Sonnet 4.6's `zoom` action; system prompt steers the model to zoom rather than low-confidence click.
+- [x] Agent-side `_handle_zoom` crops to the requested region and returns it as the tool_result image.
+- [ ] Self-heal v2: on executor failure, automatically replan with a "last action missed, re-look" prompt.
 - [ ] Cross-product chain: IM receives a Calendar invite → switch to Calendar → accept → switch back to IM → assert read state.
 - [ ] UI-drift A/B: manually nudge a target button 20 px, re-run the same tests; report the delta between selector-based and CUA results.
 

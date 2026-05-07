@@ -21,13 +21,16 @@ Everything else (DSL, verification, reporting) builds on top of this.
 
 from __future__ import annotations
 
+import base64
+import io
 import logging
 import os
 from typing import Any
 
+from PIL import Image
 from anthropic import Anthropic
 
-from .executor import Executor
+from .executor import ActionResult, Executor
 from .perception import capture_b64, probe_display
 from .trajectory import Trajectory
 
@@ -47,6 +50,7 @@ Operating rules:
 - Prefer one atomic action per tool call (one click, one keypress, one short type).
 - After an action that may change state, inspect the next screenshot before the next action.
 - If Feishu is not in the foreground, bring it forward (click its dock icon or use app-switcher) before interacting.
+- When you are unsure about the precise location of a small UI element (icon, badge, narrow button), use the `zoom` action with a generous bounding region to view it at full resolution before clicking. This is your built-in self-heal: prefer zoom over a low-confidence click.
 - When the user's goal is complete, produce a one-sentence summary and stop (end_turn).
 - If the goal is blocked (wrong app, modal, missing permission), explain the blocker and stop."""
 
@@ -69,11 +73,13 @@ class Agent:
         max_steps: int | None = None,
         trajectory: Trajectory | None = None,
         client: Anthropic | None = None,
+        enable_zoom: bool = True,
     ):
         self.client = client or Anthropic()
         self.model = model or os.getenv("CUA_LARK_MODEL", DEFAULT_MODEL)
         self.max_steps = max_steps or int(os.getenv("CUA_LARK_MAX_STEPS", "20"))
         self.trajectory = trajectory
+        self.enable_zoom = enable_zoom
 
         display = probe_display()
         # A dry-run screenshot tells us the final (possibly resized) dims that
@@ -123,6 +129,11 @@ class Agent:
             "display_width_px": self.claude_dims[0],
             "display_height_px": self.claude_dims[1],
             "display_number": 1,
+            # Self-Heal lever: when the model is unsure about a small element, it
+            # can issue a `zoom` action to inspect a region at full resolution
+            # before committing to a click. We crop the screenshot to that
+            # region instead of running any OS action.
+            "enable_zoom": self.enable_zoom,
         }]
 
         final_text = ""
@@ -157,12 +168,11 @@ class Agent:
             tool_results = []
             for tu in tool_uses:
                 tool_input = dict(tu.input) if hasattr(tu, "input") else {}
-                result = self.executor.dispatch(tool_input)
+                result, return_b64 = self._handle_action(tool_input)
 
-                after_b64, _ = capture_b64()
                 after_filename = None
                 if self.trajectory:
-                    after_filename = self.trajectory.save_screenshot(after_b64)
+                    after_filename = self.trajectory.save_screenshot(return_b64)
                     self.trajectory.log_action(step, tu.id, tool_input, result, after_filename)
 
                 blocks: list[dict[str, Any]] = []
@@ -173,7 +183,7 @@ class Agent:
                     "source": {
                         "type": "base64",
                         "media_type": "image/png",
-                        "data": after_b64,
+                        "data": return_b64,
                     },
                 })
                 tool_results.append({
@@ -197,3 +207,52 @@ class Agent:
             "status": status,
             "steps_used": steps_used,
         }
+
+    # ---- per-action handler ---------------------------------------------
+
+    def _handle_action(self, tool_input: dict[str, Any]) -> tuple[ActionResult, str]:
+        """Dispatch a single tool call.
+
+        Returns ``(result, image_b64)``: the image is what we feed back to
+        Claude as the tool_result. For ``zoom`` it's the cropped region, for
+        every other action it's a fresh full-screen screenshot.
+        """
+        action = tool_input.get("action")
+        if action == "zoom":
+            return self._handle_zoom(tool_input)
+        result = self.executor.dispatch(tool_input)
+        after_b64, _ = capture_b64()
+        return result, after_b64
+
+    def _handle_zoom(self, tool_input: dict[str, Any]) -> tuple[ActionResult, str]:
+        """Crop the current screen to ``region`` and return that as the result.
+
+        ``region`` is ``[x1, y1, x2, y2]`` in Claude-space pixels.
+        """
+        region = tool_input.get("region")
+        full_b64, (claude_w, claude_h) = capture_b64()
+        if not region or len(region) != 4:
+            return (
+                ActionResult(action="zoom", ok=False, detail="missing or malformed region"),
+                full_b64,
+            )
+        x1, y1, x2, y2 = (int(v) for v in region)
+        x1 = max(0, min(x1, claude_w - 1))
+        y1 = max(0, min(y1, claude_h - 1))
+        x2 = max(x1 + 1, min(x2, claude_w))
+        y2 = max(y1 + 1, min(y2, claude_h))
+        try:
+            img = Image.open(io.BytesIO(base64.standard_b64decode(full_b64)))
+            cropped = img.crop((x1, y1, x2, y2))
+            buf = io.BytesIO()
+            cropped.save(buf, format="PNG", optimize=True)
+            cropped_b64 = base64.standard_b64encode(buf.getvalue()).decode("ascii")
+        except Exception as exc:  # noqa: BLE001 — surface zoom failure to the model
+            return (
+                ActionResult(action="zoom", ok=False, detail=f"zoom crop failed: {exc}"),
+                full_b64,
+            )
+        return (
+            ActionResult(action="zoom", ok=True, detail=f"region={x1},{y1},{x2},{y2}"),
+            cropped_b64,
+        )

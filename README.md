@@ -42,8 +42,8 @@ Traditional GUI automation breaks every time the UI changes. A vision-language a
 | M1 | Screenshot → Claude → single-step click/type loop | done |
 | M2 | DSL + CDP client + Verifier + 3 IM cases | code done, live-debug pending |
 | M3 | Docs + Calendar coverage | next |
-| M4 | Eval framework + HTML report | |
-| M5 | Self-heal (via `zoom`) + cross-product chains | |
+| M4 | HTML report (per-run + index) | done; metrics dashboard pending |
+| M5 | Self-heal via Sonnet 4.6 `zoom` | done; cross-product chain pending |
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for the full plan.
 
@@ -79,6 +79,10 @@ python -m cua_lark.cli test tests/feishu/im/
 
 # Filter by tag, or skip CDP if Feishu was launched without --remote-debugging-port
 python -m cua_lark.cli test tests/feishu/ --tag im --no-cdp
+
+# Generate HTML reports from past runs (M4)
+python -m cua_lark.cli report runs/                # whole runs/ → index + per-run reports
+python -m cua_lark.cli report runs/20260507_140312 # single run → just its report.html
 ```
 
 Every run writes a trajectory to `runs/<timestamp>/` (screenshots + `trajectory.json`,
@@ -116,19 +120,21 @@ cua-lark/
 ├── cua_lark/           # library
 │   ├── perception.py   # screenshot + Retina scaling
 │   ├── executor.py     # PyAutoGUI wrapper
-│   ├── agent.py        # Claude Computer Use loop
+│   ├── agent.py        # Claude Computer Use loop + zoom self-heal
 │   ├── trajectory.py   # per-run artifact log
 │   ├── cdp.py          # Electron debug-port client
 │   ├── verifier.py     # VLM + CDP assertion engines
 │   ├── dsl.py          # @cua_test decorator + TestContext
 │   ├── runner.py       # discover / execute / report
-│   └── cli.py          # `cua-lark run`, `cua-lark test`
+│   ├── report.py       # HTML report generator (M4)
+│   └── cli.py          # `cua-lark run | test | report`
 ├── examples/
 │   └── hello_feishu.py
 ├── tests/feishu/im/    # M2 test cases
 ├── docs/
 │   ├── DESIGN.md
-│   └── ROADMAP.md
+│   ├── ROADMAP.md
+│   └── SUBMISSION.md   # 复赛提交文档(中文)
 └── runs/               # per-run artifacts (gitignored)
 ```
 
